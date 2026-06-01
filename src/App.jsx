@@ -23,9 +23,7 @@ function getRssi(device) {
   return null
 }
 
-function parseLastSeen(device) {
-  const value =
-    device.last_seen ?? device.lastSeen ?? device.last_seen_at ?? device.lastSeenAt
+function parseTimestamp(value) {
   if (value == null) {
     return null
   }
@@ -38,12 +36,42 @@ function parseLastSeen(device) {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
-function formatLastSeen(value) {
+function parseLastSeen(device) {
+  return parseTimestamp(
+    device.last_seen ?? device.lastSeen ?? device.last_seen_at ?? device.lastSeenAt,
+  )
+}
+
+function formatTimestamp(value) {
   if (!value) return 'No disponible'
   return new Intl.DateTimeFormat('es-ES', {
     dateStyle: 'short',
     timeStyle: 'short',
   }).format(value)
+}
+
+function getDeviceId(device, index) {
+  return device.device_id ?? device.id ?? device.deviceId ?? `device-${index + 1}`
+}
+
+function parseDeviceList(data) {
+  return Array.isArray(data)
+    ? data
+    : Array.isArray(data?.data)
+    ? data.data
+    : Array.isArray(data?.devices)
+    ? data.devices
+    : []
+}
+
+function parseTelemetryList(data) {
+  return Array.isArray(data)
+    ? data
+    : Array.isArray(data?.data)
+    ? data.data
+    : Array.isArray(data?.telemetry)
+    ? data.telemetry
+    : []
 }
 
 function isOffline(lastSeen, onlineFlag) {
@@ -57,29 +85,43 @@ function App() {
   const [devices, setDevices] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [lastUpdated, setLastUpdated] = useState(null)
+  const [selectedDeviceId, setSelectedDeviceId] = useState(null)
+  const [telemetry, setTelemetry] = useState([])
+  const [telemetryLoading, setTelemetryLoading] = useState(false)
+  const [telemetryError, setTelemetryError] = useState(null)
+
+  async function fetchJson(url, signal) {
+    const response = await fetch(url, { signal })
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+    return response.json()
+  }
+
+  async function loadDevices(signal) {
+    const data = await fetchJson('/api/v1/devices', signal)
+    setDevices(parseDeviceList(data))
+    setError(null)
+    setLastUpdated(new Date())
+  }
+
+  async function loadTelemetry(deviceId, signal) {
+    const data = await fetchJson(
+      `/api/v1/telemetry?deviceId=${encodeURIComponent(deviceId)}&limit=20`,
+      signal,
+    )
+    setTelemetry(parseTelemetryList(data))
+    setTelemetryError(null)
+  }
 
   useEffect(() => {
     const controller = new AbortController()
+    const refreshInterval = 10000
 
-    async function loadDevices() {
+    async function execute() {
       try {
-        const response = await fetch('/api/v1/devices', {
-          signal: controller.signal,
-        })
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`)
-        }
-
-        const data = await response.json()
-        const list = Array.isArray(data)
-          ? data
-          : Array.isArray(data?.data)
-          ? data.data
-          : Array.isArray(data?.devices)
-          ? data.devices
-          : []
-        setDevices(list)
+        await loadDevices(controller.signal)
       } catch (err) {
         if (err.name !== 'AbortError') {
           setError(err.message || 'Error al cargar dispositivos')
@@ -89,9 +131,44 @@ function App() {
       }
     }
 
-    loadDevices()
-    return () => controller.abort()
+    setLoading(true)
+    execute()
+    const intervalId = setInterval(execute, refreshInterval)
+
+    return () => {
+      controller.abort()
+      clearInterval(intervalId)
+    }
   }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    if (!selectedDeviceId) {
+      setTelemetry([])
+      setTelemetryError(null)
+      setTelemetryLoading(false)
+      return () => {}
+    }
+
+    async function executeTelemetry() {
+      try {
+        setTelemetryLoading(true)
+        await loadTelemetry(selectedDeviceId, controller.signal)
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          setTelemetryError(err.message || 'Error al cargar telemetría')
+        }
+      } finally {
+        setTelemetryLoading(false)
+      }
+    }
+
+    executeTelemetry()
+    return () => controller.abort()
+  }, [selectedDeviceId])
+
+  const selectedDevice = devices.find((device, index) => getDeviceId(device, index) === selectedDeviceId)
 
   return (
     <main className="app-shell">
@@ -102,6 +179,12 @@ function App() {
           <p className="hero-copy">
             Dashboard limpio para ver estado, temperatura y conexión WiFi.
           </p>
+          {lastUpdated && (
+            <p className="update-time">Última actualización: {new Intl.DateTimeFormat('es-ES', {
+              dateStyle: 'short',
+              timeStyle: 'medium',
+            }).format(lastUpdated)}</p>
+          )}
         </div>
         <div className="status-pill">
           {loading ? 'Cargando...' : error ? 'Error' : `${devices.length} dispositivos`}
@@ -133,12 +216,25 @@ function App() {
                   : 'Offline'
                 : 'Desconocido'
               const statusClass = status === 'Online' ? 'online' : status === 'Offline' ? 'offline' : 'unknown'
-              const deviceId = device.device_id ?? device.id ?? device.deviceId ?? `device-${index + 1}`
+              const deviceId = getDeviceId(device, index)
               const title = device.device_id ?? deviceId
               const subtitle = device.name ?? device.label ?? 'Sin nombre'
+              const isSelected = selectedDeviceId === deviceId
 
               return (
-                <article className="device-card" key={deviceId}>
+                <article
+                  className={`device-card${isSelected ? ' selected' : ''}`}
+                  key={deviceId}
+                  tabIndex={0}
+                  role="button"
+                  onClick={() => setSelectedDeviceId(deviceId)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      setSelectedDeviceId(deviceId)
+                    }
+                  }}
+                >
                   <div className="device-heading">
                     <div>
                       <p className="device-name">{title}</p>
@@ -165,7 +261,7 @@ function App() {
                   <dl className="device-meta">
                     <div>
                       <dt>Última conexión</dt>
-                      <dd>{formatLastSeen(lastSeen)}</dd>
+                      <dd>{formatTimestamp(lastSeen)}</dd>
                     </div>
                     {device.model && (
                       <div>
@@ -183,6 +279,57 @@ function App() {
                 </article>
               )
             })}
+          </div>
+        )}
+      </section>
+
+      <section className="telemetry-panel">
+        <div className="telemetry-header">
+          <div>
+            <h2>Histórico de telemetría</h2>
+            <p className="telemetry-note">
+              {selectedDevice
+                ? `Últimas 20 lecturas de ${selectedDevice.device_id ?? selectedDevice.id ?? selectedDevice.deviceId}`
+                : 'Haz clic en una tarjeta para ver las lecturas recientes de ese dispositivo.'}
+            </p>
+          </div>
+        </div>
+
+        {selectedDevice && telemetryError && (
+          <div className="notice error">{telemetryError}</div>
+        )}
+
+        {selectedDevice && telemetryLoading && (
+          <div className="notice">Cargando telemetría...</div>
+        )}
+
+        {selectedDevice && !telemetryLoading && !telemetryError && (
+          <div className="telemetry-table">
+            <div className="telemetry-row telemetry-row-header">
+              <span>Recibido</span>
+              <span>Temperatura</span>
+              <span>RSSI WiFi</span>
+            </div>
+
+            {telemetry.length > 0 ? (
+              telemetry.map((item, index) => {
+                const timestamp = parseTimestamp(
+                  item.received_at ?? item.receivedAt ?? item.timestamp ?? item.time,
+                )
+                const temperature = getTemperature(item)
+                const rssi = getRssi(item)
+
+                return (
+                  <div className="telemetry-row" key={item.id ?? item.record_id ?? index}>
+                    <span>{formatTimestamp(timestamp)}</span>
+                    <span>{temperature != null ? `${temperature}°C` : 'N/D'}</span>
+                    <span>{rssi != null ? `${rssi} dBm` : 'N/D'}</span>
+                  </div>
+                )
+              })
+            ) : (
+              <div className="notice">No hay lecturas recientes para este dispositivo.</div>
+            )}
           </div>
         )}
       </section>
