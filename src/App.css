@@ -1,0 +1,189 @@
+.app-shell {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  margin-bottom: 32px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  letter-spacing: 0.2em;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #6366f1;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(2.25rem, 3vw, 3rem);
+  line-height: 1.05;
+  color: #111827;
+}
+
+.hero-copy {
+  margin: 16px 0 0;
+  max-width: 580px;
+  color: #475569;
+  line-height: 1.75;
+}
+
+.status-pill {
+  padding: 12px 18px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.devices-section {
+  display: grid;
+  gap: 20px;
+}
+
+.device-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+}
+
+.device-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 24px;
+  padding: 26px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.device-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 26px 60px rgba(15, 23, 42, 0.12);
+}
+
+.device-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 22px;
+}
+
+.device-name {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.device-subtitle {
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.device-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  min-width: 104px;
+  text-align: center;
+}
+
+.device-badge.online {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.device-badge.offline {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.device-badge.unknown {
+  background: #eef2ff;
+  color: #1d4ed8;
+}
+
+.device-summary {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stat-block {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 18px 20px;
+}
+
+.stat-label {
+  display: block;
+  margin-bottom: 10px;
+  color: #475569;
+  font-size: 0.86rem;
+  letter-spacing: 0.02em;
+}
+
+.stat-value {
+  display: block;
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.device-meta {
+  display: grid;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.device-meta dt {
+  color: #475569;
+  font-size: 0.84rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.device-meta dd {
+  margin: 0;
+  color: #0f172a;
+  font-size: 0.96rem;
+  line-height: 1.55;
+}
+
+.notice {
+  padding: 18px 20px;
+  border-radius: 18px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+}
+
+.notice.error {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+@media (max-width: 720px) {
+  .device-summary {
+    grid-template-columns: 1fr;
+  }
+}
