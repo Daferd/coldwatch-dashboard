@@ -32,6 +32,17 @@ function parseTimestamp(value) {
     return new Date(value > 1e12 ? value : value * 1000)
   }
 
+  if (typeof value === 'string') {
+    // Detectar formato SQLite: "YYYY-MM-DD HH:mm:ss" (UTC)
+    const sqliteMatch = value.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/)
+    if (sqliteMatch) {
+      // Convertir a ISO 8601 con Z (UTC) para parsing correcto
+      const iso = value.replace(' ', 'T') + 'Z'
+      const date = new Date(iso)
+      return Number.isNaN(date.getTime()) ? null : date
+    }
+  }
+
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? null : date
 }
@@ -43,11 +54,16 @@ function parseLastSeen(device) {
 }
 
 function formatTimestamp(value) {
-  if (!value) return 'No disponible'
-  return new Intl.DateTimeFormat('es-ES', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(value)
+  if (!value || !(value instanceof Date)) return 'No disponible'
+  if (Number.isNaN(value.getTime())) return 'No disponible'
+  
+  const hours = String(value.getHours()).padStart(2, '0')
+  const minutes = String(value.getMinutes()).padStart(2, '0')
+  const seconds = String(value.getSeconds()).padStart(2, '0')
+  const day = String(value.getDate()).padStart(2, '0')
+  const month = String(value.getMonth() + 1).padStart(2, '0')
+  const year = value.getFullYear()
+  return `${hours}:${minutes}:${seconds} ${day}/${month}/${year}`
 }
 
 function getDeviceId(device, index) {
@@ -180,10 +196,7 @@ function App() {
             Dashboard limpio para ver estado, temperatura y conexión WiFi.
           </p>
           {lastUpdated && (
-            <p className="update-time">Última actualización: {new Intl.DateTimeFormat('es-ES', {
-              dateStyle: 'short',
-              timeStyle: 'medium',
-            }).format(lastUpdated)}</p>
+            <p className="update-time">Última actualización: {formatTimestamp(lastUpdated)}</p>
           )}
         </div>
         <div className="status-pill">
