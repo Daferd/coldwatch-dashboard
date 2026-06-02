@@ -1,4 +1,13 @@
 import { useEffect, useState } from 'react'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts'
 import './App.css'
 
 const RELATIVE_THRESHOLD = 2 * 60 * 1000
@@ -138,6 +147,9 @@ function App() {
     async function execute() {
       try {
         await loadDevices(controller.signal)
+        if (selectedDeviceId) {
+          await loadTelemetry(selectedDeviceId, controller.signal)
+        }
       } catch (err) {
         if (err.name !== 'AbortError') {
           setError(err.message || 'Error al cargar dispositivos')
@@ -155,7 +167,7 @@ function App() {
       controller.abort()
       clearInterval(intervalId)
     }
-  }, [])
+  }, [selectedDeviceId])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -185,6 +197,21 @@ function App() {
   }, [selectedDeviceId])
 
   const selectedDevice = devices.find((device, index) => getDeviceId(device, index) === selectedDeviceId)
+  const chartData = telemetry
+    .map((item) => {
+      const timestamp = parseTimestamp(
+        item.received_at ?? item.receivedAt ?? item.timestamp ?? item.time,
+      )
+      const temperature = getTemperature(item)
+      if (!timestamp || temperature == null) {
+        return null
+      }
+      return {
+        time: formatTimestamp(timestamp),
+        temperature,
+      }
+    })
+    .filter(Boolean)
 
   return (
     <main className="app-shell">
@@ -231,7 +258,7 @@ function App() {
               const statusClass = status === 'Online' ? 'online' : status === 'Offline' ? 'offline' : 'unknown'
               const deviceId = getDeviceId(device, index)
               const title = device.device_id ?? deviceId
-              const subtitle = device.name ?? device.label ?? 'Sin nombre'
+              const subtitle = device.name ?? device.label ?? null
               const isSelected = selectedDeviceId === deviceId
 
               return (
@@ -251,7 +278,7 @@ function App() {
                   <div className="device-heading">
                     <div>
                       <p className="device-name">{title}</p>
-                      <p className="device-subtitle">{subtitle}</p>
+                      {subtitle && <p className="device-subtitle">{subtitle}</p>}
                     </div>
                     <span className={`device-badge ${statusClass}`}>{status}</span>
                   </div>
@@ -317,12 +344,31 @@ function App() {
         )}
 
         {selectedDevice && !telemetryLoading && !telemetryError && (
-          <div className="telemetry-table">
-            <div className="telemetry-row telemetry-row-header">
-              <span>Recibido</span>
-              <span>Temperatura</span>
-              <span>RSSI WiFi</span>
+          <>
+            <div className="telemetry-chart-panel">
+              <div className="chart-header">
+                <h3>Evolución de temperatura</h3>
+              </div>
+              {chartData.length > 1 ? (
+                <ResponsiveContainer width="100%" height={320}>
+                  <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                    <CartesianGrid stroke="#e5e7eb" strokeDasharray="3 3" />
+                    <XAxis dataKey="time" tick={{ fill: '#475569', fontSize: 12 }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fill: '#475569', fontSize: 12 }} tickLine={false} axisLine={false} />
+                    <Tooltip cursor={{ stroke: '#8b5cf6', strokeWidth: 2 }} formatter={(value) => [`${value}°C`, 'Temperatura']} />
+                    <Line type="monotone" dataKey="temperature" stroke="#6366f1" strokeWidth={3} dot={{ r: 4, fill: '#6366f1' }} activeDot={{ r: 6 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="notice">No hay datos suficientes para graficar la temperatura.</div>
+              )}
             </div>
+            <div className="telemetry-table">
+              <div className="telemetry-row telemetry-row-header">
+                <span>Recibido</span>
+                <span>Temperatura</span>
+                <span>RSSI WiFi</span>
+              </div>
 
             {telemetry.length > 0 ? (
               telemetry.map((item, index) => {
@@ -344,6 +390,7 @@ function App() {
               <div className="notice">No hay lecturas recientes para este dispositivo.</div>
             )}
           </div>
+          </>
         )}
       </section>
     </main>

@@ -201,6 +201,20 @@ h1 {
   max-width: 680px;
 }
 
+.telemetry-chart-panel {
+  margin-bottom: 28px;
+}
+
+.chart-header {
+  margin-bottom: 16px;
+}
+
+.chart-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #111827;
+}
+
 .telemetry-table {
   display: grid;
   border-top: 1px solid #e2e8f0;
