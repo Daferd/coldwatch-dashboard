@@ -148,7 +148,20 @@ function App() {
       try {
         await loadDevices(controller.signal)
         if (selectedDeviceId) {
-          await loadTelemetry(selectedDeviceId, controller.signal)
+          try {
+            setTelemetryLoading(true)
+            await loadTelemetry(selectedDeviceId, controller.signal)
+          } catch (err) {
+            if (err.name !== 'AbortError') {
+              setTelemetryError(err.message || 'Error al cargar telemetría')
+            }
+          } finally {
+            setTelemetryLoading(false)
+          }
+        } else {
+          setTelemetry([])
+          setTelemetryError(null)
+          setTelemetryLoading(false)
         }
       } catch (err) {
         if (err.name !== 'AbortError') {
@@ -169,34 +182,19 @@ function App() {
     }
   }, [selectedDeviceId])
 
-  useEffect(() => {
-    const controller = new AbortController()
-
-    if (!selectedDeviceId) {
-      setTelemetry([])
-      setTelemetryError(null)
-      setTelemetryLoading(false)
-      return () => {}
-    }
-
-    async function executeTelemetry() {
-      try {
-        setTelemetryLoading(true)
-        await loadTelemetry(selectedDeviceId, controller.signal)
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          setTelemetryError(err.message || 'Error al cargar telemetría')
-        }
-      } finally {
-        setTelemetryLoading(false)
-      }
-    }
-
-    executeTelemetry()
-    return () => controller.abort()
-  }, [selectedDeviceId])
-
   const selectedDevice = devices.find((device, index) => getDeviceId(device, index) === selectedDeviceId)
+
+  const validTemperatures = telemetry
+    .map((item) => Number(getTemperature(item)))
+    .filter((value) => typeof value === 'number' && !Number.isNaN(value))
+
+  const temperatureCount = validTemperatures.length
+  const currentTemperature = temperatureCount > 0 ? validTemperatures[0] : null
+  const minTemperature = temperatureCount > 0 ? Math.min(...validTemperatures) : null
+  const maxTemperature = temperatureCount > 0 ? Math.max(...validTemperatures) : null
+  const averageTemperature =
+    temperatureCount > 0 ? validTemperatures.reduce((sum, value) => sum + value, 0) / temperatureCount : null
+
   const chartData = telemetry
     .map((item) => {
       const timestamp = parseTimestamp(
@@ -345,6 +343,36 @@ function App() {
 
         {selectedDevice && !telemetryLoading && !telemetryError && (
           <>
+            <div className="telemetry-stats-grid">
+              <div className="stat-card">
+                <span className="stat-label">Temperatura actual</span>
+                <strong className="stat-value">
+                  {currentTemperature != null ? `${currentTemperature.toFixed(1)}°C` : 'N/D'}
+                </strong>
+              </div>
+              <div className="stat-card">
+                <span className="stat-label">Mínima</span>
+                <strong className="stat-value">
+                  {minTemperature != null ? `${minTemperature.toFixed(1)}°C` : 'N/D'}
+                </strong>
+              </div>
+              <div className="stat-card">
+                <span className="stat-label">Máxima</span>
+                <strong className="stat-value">
+                  {maxTemperature != null ? `${maxTemperature.toFixed(1)}°C` : 'N/D'}
+                </strong>
+              </div>
+              <div className="stat-card">
+                <span className="stat-label">Promedio</span>
+                <strong className="stat-value">
+                  {averageTemperature != null ? `${averageTemperature.toFixed(1)}°C` : 'N/D'}
+                </strong>
+              </div>
+              <div className="stat-card">
+                <span className="stat-label">Lecturas</span>
+                <strong className="stat-value">{temperatureCount}</strong>
+              </div>
+            </div>
             <div className="telemetry-chart-panel">
               <div className="chart-header">
                 <h3>Evolución de temperatura</h3>
