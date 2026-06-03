@@ -99,6 +99,23 @@ function parseTelemetryList(data) {
     : []
 }
 
+function getThermalState(temperature) {
+  if (temperature == null || Number.isNaN(Number(temperature))) {
+    return { label: 'SIN DATOS', key: 'unknown' }
+  }
+
+  const value = Number(temperature)
+  if (value < 30) {
+    return { label: '🟢 NORMAL', key: 'normal' }
+  }
+
+  if (value < 35) {
+    return { label: '🟡 ADVERTENCIA', key: 'warning' }
+  }
+
+  return { label: '🔴 CRÍTICA', key: 'critical' }
+}
+
 function isOffline(lastSeen, onlineFlag) {
   if (lastSeen) {
     return Date.now() - lastSeen.getTime() > RELATIVE_THRESHOLD
@@ -258,10 +275,11 @@ function App() {
               const title = device.device_id ?? deviceId
               const subtitle = device.name ?? device.label ?? null
               const isSelected = selectedDeviceId === deviceId
+              const thermalState = getThermalState(temperature)
 
               return (
                 <article
-                  className={`device-card${isSelected ? ' selected' : ''}`}
+                  className={`device-card ${thermalState.key}${isSelected ? ' selected' : ''}`}
                   key={deviceId}
                   tabIndex={0}
                   role="button"
@@ -278,7 +296,10 @@ function App() {
                       <p className="device-name">{title}</p>
                       {subtitle && <p className="device-subtitle">{subtitle}</p>}
                     </div>
-                    <span className={`device-badge ${statusClass}`}>{status}</span>
+                    <div className="device-tags">
+                      <span className={`device-badge ${statusClass}`}>{status}</span>
+                      <span className={`device-alert-badge ${thermalState.key}`}>{thermalState.label}</span>
+                    </div>
                   </div>
 
                   <div className="device-summary">

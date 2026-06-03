@@ -81,6 +81,22 @@ h1 {
   box-shadow: 0 28px 70px rgba(99, 102, 241, 0.12);
 }
 
+.device-card.normal {
+  border-color: #d1fae5;
+}
+
+.device-card.warning {
+  border-color: #fef3c7;
+}
+
+.device-card.critical {
+  border-color: #fee2e2;
+}
+
+.device-card.unknown {
+  border-color: #e5e7eb;
+}
+
 .device-heading {
   display: flex;
   justify-content: space-between;
@@ -129,6 +145,47 @@ h1 {
 .device-badge.unknown {
   background: #eef2ff;
   color: #1d4ed8;
+}
+
+.device-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.device-alert-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  min-width: 124px;
+  text-align: center;
+}
+
+.device-alert-badge.normal {
+  background: #ecfdf5;
+  color: #166534;
+}
+
+.device-alert-badge.warning {
+  background: #fffbeb;
+  color: #713f12;
+}
+
+.device-alert-badge.critical {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.device-alert-badge.unknown {
+  background: #f3f4f6;
+  color: #475569;
 }
 
 .device-summary {
