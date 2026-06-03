@@ -116,6 +116,43 @@ function getThermalState(temperature) {
   return { label: '🔴 CRÍTICA', key: 'critical' }
 }
 
+function getAlertMessage(thermalState, temperature) {
+  const formattedTemp = temperature != null && !Number.isNaN(Number(temperature))
+    ? `${Number(temperature).toFixed(1)}°C`
+    : 'temperatura no disponible'
+
+  if (thermalState.key === 'critical') {
+    return `Temperatura crítica: ${formattedTemp}`
+  }
+
+  if (thermalState.key === 'warning') {
+    return `Temperatura elevada: ${formattedTemp}`
+  }
+
+  return null
+}
+
+function getActiveAlerts(devices) {
+  return devices.flatMap((device, index) => {
+    const temperature = getTemperature(device)
+    const thermalState = getThermalState(temperature)
+    const deviceId = getDeviceId(device, index)
+    const message = getAlertMessage(thermalState, temperature)
+
+    if (!message) {
+      return []
+    }
+
+    return [{
+      id: `${deviceId}-${thermalState.key}`,
+      deviceId,
+      severity: thermalState.key,
+      icon: thermalState.key === 'critical' ? '🔴' : '🟡',
+      message,
+    }]
+  })
+}
+
 function isOffline(lastSeen, onlineFlag) {
   if (lastSeen) {
     return Date.now() - lastSeen.getTime() > RELATIVE_THRESHOLD
@@ -200,6 +237,7 @@ function App() {
   }, [selectedDeviceId])
 
   const selectedDevice = devices.find((device, index) => getDeviceId(device, index) === selectedDeviceId)
+  const activeAlerts = getActiveAlerts(devices)
 
   const validTemperatures = telemetry
     .map((item) => Number(getTemperature(item)))
@@ -245,6 +283,35 @@ function App() {
           {loading ? 'Cargando...' : error ? 'Error' : `${devices.length} dispositivos`}
         </div>
       </header>
+
+      <section className="alerts-section">
+        <div className="alerts-header">
+          <div>
+            <h2>Alertas activas</h2>
+            <p className="alerts-note">
+              {activeAlerts.length > 0
+                ? `${activeAlerts.length} alerta${activeAlerts.length > 1 ? 's' : ''} activa${activeAlerts.length > 1 ? 's' : ''}`
+                : 'Sistema estable por el momento.'}
+            </p>
+          </div>
+        </div>
+        <div className="alerts-list">
+          {activeAlerts.length === 0 ? (
+            <div className="notice success">✅ No hay alertas activas</div>
+          ) : (
+            activeAlerts.map((alert) => (
+              <div key={alert.id} className={`alert-item ${alert.severity}`}>
+                <span className="alert-icon">{alert.icon}</span>
+                <div>
+                  <p className="alert-message">
+                    <strong>{alert.deviceId}</strong> - {alert.message}
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
 
       <section className="devices-section">
         {error && <div className="notice error">{error}</div>}

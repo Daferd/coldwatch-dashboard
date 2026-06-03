@@ -51,6 +51,76 @@ h1 {
   white-space: nowrap;
 }
 
+.alerts-section {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.alerts-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.alerts-header h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  color: #111827;
+}
+
+.alerts-note {
+  margin: 6px 0 0;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.alerts-list {
+  display: grid;
+  gap: 12px;
+}
+
+.alert-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  padding: 18px 20px;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+}
+
+.alert-item .alert-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+  margin-top: 4px;
+}
+
+.alert-message {
+  margin: 0;
+  font-size: 0.98rem;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.alert-item.warning {
+  border-color: #fef3c7;
+  background: #fffbeb;
+}
+
+.alert-item.critical {
+  border-color: #fee2e2;
+  background: #fef2f2;
+}
+
+.notice.success {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+  color: #14532d;
+}
+
 .devices-section {
   display: grid;
   gap: 20px;
