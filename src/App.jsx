@@ -99,6 +99,16 @@ function parseTelemetryList(data) {
     : []
 }
 
+function parseAlertList(data) {
+  return Array.isArray(data)
+    ? data
+    : Array.isArray(data?.data)
+    ? data.data
+    : Array.isArray(data?.alerts)
+    ? data.alerts
+    : []
+}
+
 function getThermalState(temperature) {
   if (temperature == null || Number.isNaN(Number(temperature))) {
     return { label: 'SIN DATOS', key: 'unknown' }
@@ -114,43 +124,6 @@ function getThermalState(temperature) {
   }
 
   return { label: '🔴 CRÍTICA', key: 'critical' }
-}
-
-function getAlertMessage(thermalState, temperature) {
-  const formattedTemp = temperature != null && !Number.isNaN(Number(temperature))
-    ? `${Number(temperature).toFixed(1)}°C`
-    : 'temperatura no disponible'
-
-  if (thermalState.key === 'critical') {
-    return `Temperatura crítica: ${formattedTemp}`
-  }
-
-  if (thermalState.key === 'warning') {
-    return `Temperatura elevada: ${formattedTemp}`
-  }
-
-  return null
-}
-
-function getActiveAlerts(devices) {
-  return devices.flatMap((device, index) => {
-    const temperature = getTemperature(device)
-    const thermalState = getThermalState(temperature)
-    const deviceId = getDeviceId(device, index)
-    const message = getAlertMessage(thermalState, temperature)
-
-    if (!message) {
-      return []
-    }
-
-    return [{
-      id: `${deviceId}-${thermalState.key}`,
-      deviceId,
-      severity: thermalState.key,
-      icon: thermalState.key === 'critical' ? '🔴' : '🟡',
-      message,
-    }]
-  })
 }
 
 function isOffline(lastSeen, onlineFlag) {
@@ -169,6 +142,8 @@ function App() {
   const [telemetry, setTelemetry] = useState([])
   const [telemetryLoading, setTelemetryLoading] = useState(false)
   const [telemetryError, setTelemetryError] = useState(null)
+  const [alerts, setAlerts] = useState([])
+  const [alertsError, setAlertsError] = useState(null)
 
   async function fetchJson(url, signal) {
     const response = await fetch(url, { signal })
@@ -194,6 +169,12 @@ function App() {
     setTelemetryError(null)
   }
 
+  async function loadAlerts(signal) {
+    const data = await fetchJson('/api/v1/alerts', signal)
+    setAlerts(parseAlertList(data))
+    setAlertsError(null)
+  }
+
   useEffect(() => {
     const controller = new AbortController()
     const refreshInterval = 10000
@@ -201,29 +182,38 @@ function App() {
     async function execute() {
       try {
         await loadDevices(controller.signal)
-        if (selectedDeviceId) {
-          try {
-            setTelemetryLoading(true)
-            await loadTelemetry(selectedDeviceId, controller.signal)
-          } catch (err) {
-            if (err.name !== 'AbortError') {
-              setTelemetryError(err.message || 'Error al cargar telemetría')
-            }
-          } finally {
-            setTelemetryLoading(false)
-          }
-        } else {
-          setTelemetry([])
-          setTelemetryError(null)
-          setTelemetryLoading(false)
-        }
       } catch (err) {
         if (err.name !== 'AbortError') {
           setError(err.message || 'Error al cargar dispositivos')
         }
-      } finally {
-        setLoading(false)
       }
+
+      try {
+        await loadAlerts(controller.signal)
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          setAlertsError(err.message || 'Error al cargar alertas')
+        }
+      }
+
+      if (selectedDeviceId) {
+        try {
+          setTelemetryLoading(true)
+          await loadTelemetry(selectedDeviceId, controller.signal)
+        } catch (err) {
+          if (err.name !== 'AbortError') {
+            setTelemetryError(err.message || 'Error al cargar telemetría')
+          }
+        } finally {
+          setTelemetryLoading(false)
+        }
+      } else {
+        setTelemetry([])
+        setTelemetryError(null)
+        setTelemetryLoading(false)
+      }
+
+      setLoading(false)
     }
 
     setLoading(true)
@@ -237,7 +227,20 @@ function App() {
   }, [selectedDeviceId])
 
   const selectedDevice = devices.find((device, index) => getDeviceId(device, index) === selectedDeviceId)
-  const activeAlerts = getActiveAlerts(devices)
+  const activeAlerts = alerts.map((alert, index) => {
+    const severity = String(alert.severity ?? 'unknown').toLowerCase()
+    const key = severity === 'critical' || severity === 'warning' ? severity : 'default'
+    const deviceId = alert.device_id ?? alert.deviceId ?? alert.device ?? `device-${index + 1}`
+
+    return {
+      id: alert.id ?? `${deviceId}-${index}`,
+      deviceId,
+      severity: key,
+      icon: severity === 'critical' ? '🔴' : severity === 'warning' ? '🟡' : '⚪',
+      message: alert.message ?? 'Alerta sin descripción',
+      createdAt: alert.created_at ?? alert.createdAt ?? alert.timestamp ?? null,
+    }
+  })
 
   const validTemperatures = telemetry
     .map((item) => Number(getTemperature(item)))
@@ -295,6 +298,7 @@ function App() {
             </p>
           </div>
         </div>
+        {alertsError && <div className="notice error">{alertsError}</div>}
         <div className="alerts-list">
           {activeAlerts.length === 0 ? (
             <div className="notice success">✅ No hay alertas activas</div>
@@ -305,6 +309,9 @@ function App() {
                 <div>
                   <p className="alert-message">
                     <strong>{alert.deviceId}</strong> - {alert.message}
+                  </p>
+                  <p className="alert-meta">
+                    {formatTimestamp(parseTimestamp(alert.createdAt))}
                   </p>
                 </div>
               </div>
