@@ -142,8 +142,11 @@ function App() {
   const [telemetry, setTelemetry] = useState([])
   const [telemetryLoading, setTelemetryLoading] = useState(false)
   const [telemetryError, setTelemetryError] = useState(null)
-  const [alerts, setAlerts] = useState([])
-  const [alertsError, setAlertsError] = useState(null)
+  const [activeAlerts, setActiveAlerts] = useState([])
+  const [historyAlerts, setHistoryAlerts] = useState([])
+  const [activeAlertsError, setActiveAlertsError] = useState(null)
+  const [historyAlertsError, setHistoryAlertsError] = useState(null)
+  const [showAlertHistory, setShowAlertHistory] = useState(false)
 
   async function fetchJson(url, signal) {
     const response = await fetch(url, { signal })
@@ -169,10 +172,16 @@ function App() {
     setTelemetryError(null)
   }
 
-  async function loadAlerts(signal) {
+  async function loadActiveAlerts(signal) {
+    const data = await fetchJson('/api/v1/alerts/active', signal)
+    setActiveAlerts(parseAlertList(data))
+    setActiveAlertsError(null)
+  }
+
+  async function loadAlertHistory(signal) {
     const data = await fetchJson('/api/v1/alerts', signal)
-    setAlerts(parseAlertList(data))
-    setAlertsError(null)
+    setHistoryAlerts(parseAlertList(data))
+    setHistoryAlertsError(null)
   }
 
   useEffect(() => {
@@ -189,10 +198,18 @@ function App() {
       }
 
       try {
-        await loadAlerts(controller.signal)
+        await loadActiveAlerts(controller.signal)
       } catch (err) {
         if (err.name !== 'AbortError') {
-          setAlertsError(err.message || 'Error al cargar alertas')
+          setActiveAlertsError(err.message || 'Error al cargar alertas activas')
+        }
+      }
+
+      try {
+        await loadAlertHistory(controller.signal)
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          setHistoryAlertsError(err.message || 'Error al cargar el historial de alertas')
         }
       }
 
@@ -227,7 +244,19 @@ function App() {
   }, [selectedDeviceId])
 
   const selectedDevice = devices.find((device, index) => getDeviceId(device, index) === selectedDeviceId)
-  const activeAlerts = alerts.map((alert, index) => {
+  const selectedDeviceTemperature = selectedDevice ? getTemperature(selectedDevice) : null
+
+  const handleDeviceSelection = (deviceId) => {
+    setSelectedDeviceId((currentId) => (currentId === deviceId ? null : deviceId))
+  }
+
+  useEffect(() => {
+    if (!selectedDeviceId) {
+      setShowAlertHistory(false)
+    }
+  }, [selectedDeviceId])
+
+  const activeAlertsList = activeAlerts.map((alert, index) => {
     const severity = String(alert.severity ?? 'unknown').toLowerCase()
     const key = severity === 'critical' || severity === 'warning' ? severity : 'default'
     const deviceId = alert.device_id ?? alert.deviceId ?? alert.device ?? `device-${index + 1}`
@@ -241,6 +270,29 @@ function App() {
       createdAt: alert.created_at ?? alert.createdAt ?? alert.timestamp ?? null,
     }
   })
+  const alertHistoryList = historyAlerts
+    .map((alert, index) => {
+      const severity = String(alert.severity ?? 'unknown').toLowerCase()
+      const key = severity === 'critical' || severity === 'warning' ? severity : 'default'
+      const deviceId = alert.device_id ?? alert.deviceId ?? alert.device ?? `device-${index + 1}`
+
+      return {
+        id: alert.id ?? `${deviceId}-${index}`,
+        date: alert.created_at ?? alert.createdAt ?? alert.timestamp ?? null,
+        deviceId,
+        severity: key,
+        message: alert.message ?? 'Alerta sin descripción',
+      }
+    })
+    .sort((a, b) => {
+      const dateA = parseTimestamp(a.date)?.getTime() ?? 0
+      const dateB = parseTimestamp(b.date)?.getTime() ?? 0
+      return dateB - dateA
+    })
+
+  const selectedDeviceAlertHistory = selectedDevice
+    ? alertHistoryList.filter((alert) => alert.deviceId === selectedDeviceId)
+    : []
 
   const validTemperatures = telemetry
     .map((item) => Number(getTemperature(item)))
@@ -292,18 +344,18 @@ function App() {
           <div>
             <h2>Alertas activas</h2>
             <p className="alerts-note">
-              {activeAlerts.length > 0
-                ? `${activeAlerts.length} alerta${activeAlerts.length > 1 ? 's' : ''} activa${activeAlerts.length > 1 ? 's' : ''}`
+              {activeAlertsList.length > 0
+                ? `${activeAlertsList.length} alerta${activeAlertsList.length > 1 ? 's' : ''} activa${activeAlertsList.length > 1 ? 's' : ''}`
                 : 'Sistema estable por el momento.'}
             </p>
           </div>
         </div>
-        {alertsError && <div className="notice error">{alertsError}</div>}
+        {activeAlertsError && <div className="notice error">{activeAlertsError}</div>}
         <div className="alerts-list">
-          {activeAlerts.length === 0 ? (
+          {activeAlertsList.length === 0 ? (
             <div className="notice success">✅ No hay alertas activas</div>
           ) : (
-            activeAlerts.map((alert) => (
+            activeAlertsList.map((alert) => (
               <div key={alert.id} className={`alert-item ${alert.severity}`}>
                 <span className="alert-icon">{alert.icon}</span>
                 <div>
@@ -357,11 +409,11 @@ function App() {
                   key={deviceId}
                   tabIndex={0}
                   role="button"
-                  onClick={() => setSelectedDeviceId(deviceId)}
+                  onClick={() => handleDeviceSelection(deviceId)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault()
-                      setSelectedDeviceId(deviceId)
+                      handleDeviceSelection(deviceId)
                     }
                   }}
                 >
@@ -416,104 +468,158 @@ function App() {
         )}
       </section>
 
-      <section className="telemetry-panel">
-        <div className="telemetry-header">
+      <section className="device-detail-section">
+        <div className="detail-header">
           <div>
-            <h2>Histórico de telemetría</h2>
-            <p className="telemetry-note">
+            <h2>Detalle de dispositivo</h2>
+            <p className="detail-note">
               {selectedDevice
-                ? `Últimas 20 lecturas de ${selectedDevice.device_id ?? selectedDevice.id ?? selectedDevice.deviceId}`
-                : 'Haz clic en una tarjeta para ver las lecturas recientes de ese dispositivo.'}
+                ? `Detalles de ${selectedDevice.device_id ?? selectedDevice.id ?? selectedDevice.deviceId}`
+                : 'Selecciona un dispositivo para ver su detalle.'}
             </p>
           </div>
         </div>
 
-        {selectedDevice && telemetryError && (
-          <div className="notice error">{telemetryError}</div>
-        )}
-
-        {selectedDevice && telemetryLoading && (
-          <div className="notice">Cargando telemetría...</div>
-        )}
-
-        {selectedDevice && !telemetryLoading && !telemetryError && (
-          <>
-            <div className="telemetry-stats-grid">
-              <div className="stat-card">
-                <span className="stat-label">Temperatura actual</span>
-                <strong className="stat-value">
-                  {currentTemperature != null ? `${currentTemperature.toFixed(1)}°C` : 'N/D'}
-                </strong>
+        {!selectedDevice ? (
+          <div className="notice">Selecciona un dispositivo para ver su detalle.</div>
+        ) : (
+          <div className="telemetry-panel">
+            <div className="detail-panel-top">
+              <div>
+                <p className="detail-device-name">{selectedDevice.device_id ?? selectedDevice.id ?? selectedDevice.deviceId}</p>
+                <p className="detail-device-meta">
+                  Temperatura actual: {selectedDeviceTemperature != null ? `${selectedDeviceTemperature}°C` : 'N/D'}
+                </p>
               </div>
-              <div className="stat-card">
-                <span className="stat-label">Mínima</span>
-                <strong className="stat-value">
-                  {minTemperature != null ? `${minTemperature.toFixed(1)}°C` : 'N/D'}
-                </strong>
-              </div>
-              <div className="stat-card">
-                <span className="stat-label">Máxima</span>
-                <strong className="stat-value">
-                  {maxTemperature != null ? `${maxTemperature.toFixed(1)}°C` : 'N/D'}
-                </strong>
-              </div>
-              <div className="stat-card">
-                <span className="stat-label">Promedio</span>
-                <strong className="stat-value">
-                  {averageTemperature != null ? `${averageTemperature.toFixed(1)}°C` : 'N/D'}
-                </strong>
-              </div>
-              <div className="stat-card">
-                <span className="stat-label">Lecturas</span>
-                <strong className="stat-value">{temperatureCount}</strong>
+              <div className="detail-device-status">
+                {selectedDevice.model && <span>{selectedDevice.model}</span>}
               </div>
             </div>
-            <div className="telemetry-chart-panel">
-              <div className="chart-header">
-                <h3>Evolución de temperatura</h3>
-              </div>
-              {chartData.length > 1 ? (
-                <ResponsiveContainer width="100%" height={320}>
-                  <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                    <CartesianGrid stroke="#e5e7eb" strokeDasharray="3 3" />
-                    <XAxis dataKey="time" tick={{ fill: '#475569', fontSize: 12 }} tickLine={false} axisLine={false} />
-                    <YAxis tick={{ fill: '#475569', fontSize: 12 }} tickLine={false} axisLine={false} />
-                    <Tooltip cursor={{ stroke: '#8b5cf6', strokeWidth: 2 }} formatter={(value) => [`${value}°C`, 'Temperatura']} />
-                    <Line type="monotone" dataKey="temperature" stroke="#6366f1" strokeWidth={3} dot={{ r: 4, fill: '#6366f1' }} activeDot={{ r: 6 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="notice">No hay datos suficientes para graficar la temperatura.</div>
+
+            {telemetryError && <div className="notice error">{telemetryError}</div>}
+            {telemetryLoading && <div className="notice">Cargando telemetría...</div>}
+
+            {!telemetryLoading && !telemetryError && (
+              <>
+                <div className="telemetry-stats-grid">
+                  <div className="stat-card">
+                    <span className="stat-label">Temperatura actual</span>
+                    <strong className="stat-value">
+                      {currentTemperature != null ? `${currentTemperature.toFixed(1)}°C` : 'N/D'}
+                    </strong>
+                  </div>
+                  <div className="stat-card">
+                    <span className="stat-label">Mínima</span>
+                    <strong className="stat-value">
+                      {minTemperature != null ? `${minTemperature.toFixed(1)}°C` : 'N/D'}
+                    </strong>
+                  </div>
+                  <div className="stat-card">
+                    <span className="stat-label">Máxima</span>
+                    <strong className="stat-value">
+                      {maxTemperature != null ? `${maxTemperature.toFixed(1)}°C` : 'N/D'}
+                    </strong>
+                  </div>
+                  <div className="stat-card">
+                    <span className="stat-label">Promedio</span>
+                    <strong className="stat-value">
+                      {averageTemperature != null ? `${averageTemperature.toFixed(1)}°C` : 'N/D'}
+                    </strong>
+                  </div>
+                  <div className="stat-card">
+                    <span className="stat-label">Lecturas</span>
+                    <strong className="stat-value">{temperatureCount}</strong>
+                  </div>
+                </div>
+                <div className="telemetry-chart-panel">
+                  <div className="chart-header">
+                    <h3>Evolución de temperatura</h3>
+                  </div>
+                  {chartData.length > 1 ? (
+                    <ResponsiveContainer width="100%" height={320}>
+                      <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                        <CartesianGrid stroke="#e5e7eb" strokeDasharray="3 3" />
+                        <XAxis dataKey="time" tick={{ fill: '#475569', fontSize: 12 }} tickLine={false} axisLine={false} />
+                        <YAxis tick={{ fill: '#475569', fontSize: 12 }} tickLine={false} axisLine={false} />
+                        <Tooltip cursor={{ stroke: '#8b5cf6', strokeWidth: 2 }} formatter={(value) => [`${value}°C`, 'Temperatura']} />
+                        <Line type="monotone" dataKey="temperature" stroke="#6366f1" strokeWidth={3} dot={{ r: 4, fill: '#6366f1' }} activeDot={{ r: 6 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="notice">No hay datos suficientes para graficar la temperatura.</div>
+                  )}
+                </div>
+                <div className="telemetry-table">
+                  <div className="telemetry-row telemetry-row-header">
+                    <span>Recibido</span>
+                    <span>Temperatura</span>
+                    <span>RSSI WiFi</span>
+                  </div>
+
+                  {telemetry.length > 0 ? (
+                    telemetry.map((item, index) => {
+                      const timestamp = parseTimestamp(
+                        item.received_at ?? item.receivedAt ?? item.timestamp ?? item.time,
+                      )
+                      const temperature = getTemperature(item)
+                      const rssi = getRssi(item)
+
+                      return (
+                        <div className="telemetry-row" key={item.id ?? item.record_id ?? index}>
+                          <span>{formatTimestamp(timestamp)}</span>
+                          <span>{temperature != null ? `${temperature}°C` : 'N/D'}</span>
+                          <span>{rssi != null ? `${rssi} dBm` : 'N/D'}</span>
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <div className="notice">No hay lecturas recientes para este dispositivo.</div>
+                  )}
+                </div>
+              </>
+            )}
+
+            <div className="alerts-history-collapse">
+              <button
+                className="collapse-toggle"
+                type="button"
+                onClick={() => setShowAlertHistory((prev) => !prev)}
+              >
+                <span>{showAlertHistory ? '▼' : '▶'}</span> Historial de alertas
+              </button>
+              {showAlertHistory && (
+                <>
+                  {historyAlertsError && <div className="notice error">{historyAlertsError}</div>}
+                  <div className="alerts-history-table-wrapper">
+                    {selectedDeviceAlertHistory.length === 0 ? (
+                      <div className="notice">No hay alertas registradas para este dispositivo.</div>
+                    ) : (
+                      <table className="alerts-history-table">
+                        <thead>
+                          <tr>
+                            <th>Fecha</th>
+                            <th>Dispositivo</th>
+                            <th>Severidad</th>
+                            <th>Mensaje</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedDeviceAlertHistory.map((alert) => (
+                            <tr key={alert.id} className={`alert-history-row ${alert.severity}`}>
+                              <td>{formatTimestamp(parseTimestamp(alert.date))}</td>
+                              <td>{alert.deviceId}</td>
+                              <td>{alert.severity.toUpperCase()}</td>
+                              <td>{alert.message}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </>
               )}
             </div>
-            <div className="telemetry-table">
-              <div className="telemetry-row telemetry-row-header">
-                <span>Recibido</span>
-                <span>Temperatura</span>
-                <span>RSSI WiFi</span>
-              </div>
-
-            {telemetry.length > 0 ? (
-              telemetry.map((item, index) => {
-                const timestamp = parseTimestamp(
-                  item.received_at ?? item.receivedAt ?? item.timestamp ?? item.time,
-                )
-                const temperature = getTemperature(item)
-                const rssi = getRssi(item)
-
-                return (
-                  <div className="telemetry-row" key={item.id ?? item.record_id ?? index}>
-                    <span>{formatTimestamp(timestamp)}</span>
-                    <span>{temperature != null ? `${temperature}°C` : 'N/D'}</span>
-                    <span>{rssi != null ? `${rssi} dBm` : 'N/D'}</span>
-                  </div>
-                )
-              })
-            ) : (
-              <div className="notice">No hay lecturas recientes para este dispositivo.</div>
-            )}
           </div>
-          </>
         )}
       </section>
     </main>

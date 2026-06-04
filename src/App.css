@@ -264,6 +264,119 @@ h1 {
   color: #475569;
 }
 
+.alerts-section,
+.alerts-history-section {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.alerts-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.alerts-header h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  color: #111827;
+}
+
+.alerts-note {
+  margin: 6px 0 0;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.alerts-list {
+  display: grid;
+  gap: 12px;
+}
+
+.alert-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  padding: 18px 20px;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+}
+
+.alert-item .alert-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+  margin-top: 4px;
+}
+
+.alert-message {
+  margin: 0;
+  font-size: 0.98rem;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.alert-meta {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.alert-item.warning {
+  border-color: #fef3c7;
+  background: #fffbeb;
+}
+
+.alert-item.critical {
+  border-color: #fee2e2;
+  background: #fef2f2;
+}
+
+.alert-item.default {
+  border-color: #e5e7eb;
+  background: #f8fafc;
+}
+
+.alerts-history-table-wrapper {
+  overflow-x: auto;
+}
+
+.alerts-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+.alerts-history-table th,
+.alerts-history-table td {
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+  color: #0f172a;
+  font-size: 0.95rem;
+}
+
+.alerts-history-table th {
+  font-weight: 700;
+  color: #111827;
+  background: #f8fafc;
+}
+
+.alert-history-row.warning {
+  background: #fffbeb;
+}
+
+.alert-history-row.critical {
+  background: #fef2f2;
+}
+
+.alert-history-row.default {
+  background: #ffffff;
+}
+
 .device-summary {
   display: grid;
   gap: 18px;
@@ -402,6 +515,81 @@ h1 {
 
 .telemetry-row:last-child {
   border-bottom: none;
+}
+
+.device-detail-section {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.detail-header h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  color: #111827;
+}
+
+.detail-note {
+  margin: 6px 0 0;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.detail-panel-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.detail-device-name {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.detail-device-meta {
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.detail-device-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #475569;
+  font-size: 0.95rem;
+}
+
+.alerts-history-collapse {
+  margin-top: 26px;
+}
+
+.collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: none;
+  background: transparent;
+  color: #1f2937;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.collapse-toggle:hover {
+  color: #111827;
 }
 
 @media (max-width: 720px) {
