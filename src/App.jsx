@@ -294,6 +294,36 @@ function App() {
     ? alertHistoryList.filter((alert) => alert.deviceId === selectedDeviceId)
     : []
 
+  const totalDevices = devices.length
+  const onlineDevices = devices.filter((device) => {
+    const lastSeen = parseLastSeen(device)
+    const statusOnline = device.online ?? device.isOnline
+    const offline = isOffline(lastSeen, statusOnline)
+
+    if (lastSeen) {
+      return !offline
+    }
+    if (statusOnline != null) {
+      return statusOnline
+    }
+    return false
+  }).length
+  const offlineDevices = devices.filter((device) => {
+    const lastSeen = parseLastSeen(device)
+    const statusOnline = device.online ?? device.isOnline
+    const offline = isOffline(lastSeen, statusOnline)
+
+    if (lastSeen) {
+      return offline
+    }
+    if (statusOnline != null) {
+      return !statusOnline
+    }
+    return false
+  }).length
+  const criticalAlerts = activeAlertsList.filter((alert) => alert.severity === 'critical').length
+  const warningAlerts = activeAlertsList.filter((alert) => alert.severity === 'warning').length
+
   const validTemperatures = telemetry
     .map((item) => Number(getTemperature(item)))
     .filter((value) => typeof value === 'number' && !Number.isNaN(value))
@@ -338,6 +368,31 @@ function App() {
           {loading ? 'Cargando...' : error ? 'Error' : `${devices.length} dispositivos`}
         </div>
       </header>
+
+      <section className="system-metrics">
+        <div className="metrics-grid">
+          <article className="metric-card">
+            <p className="metric-label">Dispositivos totales</p>
+            <strong className="metric-value">{totalDevices}</strong>
+          </article>
+          <article className="metric-card">
+            <p className="metric-label">Online</p>
+            <strong className="metric-value">{onlineDevices}</strong>
+          </article>
+          <article className="metric-card">
+            <p className="metric-label">Offline</p>
+            <strong className="metric-value">{offlineDevices}</strong>
+          </article>
+          <article className="metric-card">
+            <p className="metric-label">Alertas críticas</p>
+            <strong className="metric-value">{criticalAlerts}</strong>
+          </article>
+          <article className="metric-card">
+            <p className="metric-label">Alertas warning</p>
+            <strong className="metric-value">{warningAlerts}</strong>
+          </article>
+        </div>
+      </section>
 
       <section className="alerts-section">
         <div className="alerts-header">
